@@ -1,0 +1,611 @@
+#!/usr/bin/env python3
+"""
+Visualize Yahoo Finance Valuation Measures for the Magnificent 7
+Creates multiple charts to compare valuation metrics across companies.
+"""
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+from datetime import datetime
+import os
+
+# Set style for better-looking plots
+sns.set_style("whitegrid")
+plt.rcParams['figure.figsize'] = (14, 10)
+plt.rcParams['font.size'] = 10
+
+
+def parse_value(val):
+    """Convert formatted values like '4.14T', '37.32' back to numbers"""
+    if pd.isna(val) or val == 'N/A':
+        return np.nan
+    
+    val = str(val).strip()
+    if val.endswith('T'):
+        return float(val[:-1]) * 1_000_000_000_000
+    elif val.endswith('B'):
+        return float(val[:-1]) * 1_000_000_000
+    elif val.endswith('M'):
+        return float(val[:-1]) * 1_000_000
+    else:
+        try:
+            return float(val)
+        except ValueError:
+            return np.nan
+
+
+def load_and_prepare_data(csv_file='csv/valuation_measures_current.csv', data_source='yahoo_finance'):
+    """Load the CSV and prepare data for visualization
+    
+    Args:
+        csv_file: Path to the CSV file
+        data_source: Which data source to use ('yahoo_finance', 'stockanalysis', or 'both')
+    """
+    df = pd.read_csv(csv_file)
+    
+    # Filter by data source (default to yahoo_finance for visualization)
+    if data_source != 'both':
+        df = df[df['Data_Source'] == data_source].copy()
+    
+    # Parse numeric columns - using consolidated term names
+    numeric_cols = ['Enterprise Value', 'Market Cap', 'Enterprise Value/EBITDA', 
+                    'Enterprise Value/Revenue', 'Forward P/E', 'P/B Ratio', 
+                    'P/S Ratio', 'Trailing P/E', 'PEG Ratio']
+    
+    for col in numeric_cols:
+        if col in df.columns:
+            df[f'{col}_numeric'] = df[col].apply(parse_value)
+    
+    # Calculate VCR (Valuation Compression Ratio) = Forward P/E / Trailing P/E
+    # VCR < 1 means market expects earnings growth (forward earnings higher than trailing)
+    # VCR > 1 means market expects earnings decline
+    df['VCR_numeric'] = df['Forward P/E_numeric'] / df['Trailing P/E_numeric']
+    df['VCR'] = df['VCR_numeric'].apply(lambda x: f"{x:.3f}" if not pd.isna(x) else "N/A")
+    
+    return df
+
+
+def create_visualizations(df, version_suffix=''):
+    """Create comprehensive visualizations"""
+    
+    # Create a figure with multiple subplots (4 rows x 3 columns for VCR chart)
+    fig = plt.figure(figsize=(16, 16))
+    
+    # Get the fetch date and data source from the data
+    fetch_date = df['Fetch_Date'].iloc[0] if 'Fetch_Date' in df.columns else datetime.now().strftime('%Y-%m-%d')
+    data_source = df['Data_Source'].iloc[0] if 'Data_Source' in df.columns else 'yahoo_finance'
+    
+    # Determine title based on companies included
+    company_list = ', '.join(sorted(df['Ticker'].tolist()))
+    if len(df) < 7:
+        title = f'Valuation Measures Comparison\nMagnificent 6 (w/o TSLA)\n(Data: {fetch_date}, Source: {data_source})'
+    else:
+        title = f'Valuation Measures Comparison\nMagnificent 7\n(Data: {fetch_date}, Source: {data_source})'
+    
+    fig.suptitle(title, fontsize=16, fontweight='bold', y=0.995)
+    
+    # Define consistent color mapping for each company (sub-figures 2-9)
+    # Sort tickers to ensure consistent color assignment
+    all_tickers = sorted(df['Ticker'].unique())
+    color_palette = sns.color_palette("husl", len(all_tickers))
+    ticker_colors = {ticker: color_palette[i] for i, ticker in enumerate(all_tickers)}
+    
+    # TOP 1: P/E Ratios Comparison (Position 1 - Top Left)
+    ax1 = plt.subplot(4, 3, 1)
+    x = np.arange(len(df))
+    width = 0.35
+    trailing_pe = df.sort_values('Ticker')['Trailing P/E_numeric']
+    forward_pe = df.sort_values('Ticker')['Forward P/E_numeric']
+    tickers = df.sort_values('Ticker')['Ticker']
+    
+    ax1.bar(x - width/2, trailing_pe, width, label='Trailing P/E', alpha=0.8)
+    ax1.bar(x + width/2, forward_pe, width, label='Forward P/E', alpha=0.8)
+    ax1.set_ylabel('P/E Ratio')
+    ax1.set_title('P/E Ratios: Trailing vs Forward', fontweight='bold')
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(tickers, rotation=45)
+    ax1.legend()
+    ax1.grid(axis='y', alpha=0.3)
+    
+    # TOP 2: VCR - Valuation Compression Ratio (Position 2 - Top Center)
+    ax2 = plt.subplot(4, 3, 2)
+    vcr_sorted = df.sort_values('VCR_numeric', ascending=True).dropna(subset=['VCR_numeric'])
+    
+    # Use consistent colors for each company
+    bar_colors = [ticker_colors[ticker] for ticker in vcr_sorted['Ticker']]
+    bars2 = ax2.barh(vcr_sorted['Ticker'], vcr_sorted['VCR_numeric'], color=bar_colors, alpha=0.7)
+    
+    ax2.set_xlabel('VCR Ratio (Forward P/E / Trailing P/E)')
+    ax2.set_title('VCR - Valuation Compression Ratio\n<1: Growth | >1: Decline', 
+                  fontweight='bold', fontsize=10)
+    ax2.axvline(x=1.0, color='black', linestyle='--', linewidth=1.5, label='VCR=1.0')
+    ax2.grid(axis='x', alpha=0.3)
+    ax2.legend(loc='best')
+    
+    for i, (idx, row) in enumerate(vcr_sorted.iterrows()):
+        ax2.text(row['VCR_numeric'] + 0.02, i, 
+                f"{row['VCR_numeric']:.3f}", 
+                va='center', fontsize=9)
+    
+    # TOP 3: PEG Ratio (Position 3 - Top Right)
+    ax3 = plt.subplot(4, 3, 3)
+    peg_sorted = df.sort_values('PEG Ratio_numeric', ascending=True).dropna(subset=['PEG Ratio_numeric'])
+    bar_colors = [ticker_colors[ticker] for ticker in peg_sorted['Ticker']]
+    bars3 = ax3.barh(peg_sorted['Ticker'], peg_sorted['PEG Ratio_numeric'], color=bar_colors, alpha=0.7)
+    ax3.set_xlabel('PEG Ratio')
+    ax3.set_title('PEG Ratio (5yr expected)\nLower = Better Value', fontweight='bold', fontsize=10)
+    ax3.grid(axis='x', alpha=0.3)
+    
+    for i, (idx, row) in enumerate(peg_sorted.iterrows()):
+        ax3.text(row['PEG Ratio_numeric'] + 0.15, i, 
+                f"{row['PEG Ratio_numeric']:.2f}", 
+                va='center', fontsize=9)
+    
+    # 4. Market Cap Comparison (Position 4 - Row 2 Left)
+    ax4 = plt.subplot(4, 3, 4)
+    market_caps = df.sort_values('Market Cap_numeric', ascending=True)
+    bar_colors = [ticker_colors[ticker] for ticker in market_caps['Ticker']]
+    bars4 = ax4.barh(market_caps['Ticker'], market_caps['Market Cap_numeric'] / 1e12, color=bar_colors, alpha=0.7)
+    ax4.set_xlabel('Market Cap (Trillions $)')
+    ax4.set_title('Market Capitalization', fontweight='bold')
+    ax4.grid(axis='x', alpha=0.3)
+    
+    for i, (idx, row) in enumerate(market_caps.iterrows()):
+        ax4.text(row['Market Cap_numeric'] / 1e12 + 0.05, i, 
+                f"${row['Market Cap_numeric']/1e12:.2f}T", 
+                va='center', fontsize=9)
+    
+    # 5. Enterprise Value Comparison (Position 5 - Row 2 Center)
+    ax5 = plt.subplot(4, 3, 5)
+    ev_sorted = df.sort_values('Enterprise Value_numeric', ascending=True)
+    bar_colors = [ticker_colors[ticker] for ticker in ev_sorted['Ticker']]
+    bars5 = ax5.barh(ev_sorted['Ticker'], ev_sorted['Enterprise Value_numeric'] / 1e12, color=bar_colors, alpha=0.7)
+    ax5.set_xlabel('Enterprise Value (Trillions $)')
+    ax5.set_title('Enterprise Value', fontweight='bold')
+    ax5.grid(axis='x', alpha=0.3)
+    
+    for i, (idx, row) in enumerate(ev_sorted.iterrows()):
+        ax5.text(row['Enterprise Value_numeric'] / 1e12 + 0.05, i, 
+                f"${row['Enterprise Value_numeric']/1e12:.2f}T", 
+                va='center', fontsize=9)
+    
+    # 6. Price/Sales (Position 6 - Row 2 Right)
+    ax6 = plt.subplot(4, 3, 6)
+    ps_sorted = df.sort_values('P/S Ratio_numeric', ascending=True)
+    bar_colors = [ticker_colors[ticker] for ticker in ps_sorted['Ticker']]
+    bars6 = ax6.barh(ps_sorted['Ticker'], ps_sorted['P/S Ratio_numeric'], color=bar_colors, alpha=0.7)
+    ax6.set_xlabel('Price/Sales Ratio')
+    ax6.set_title('Price/Sales (TTM)', fontweight='bold')
+    ax6.grid(axis='x', alpha=0.3)
+    
+    for i, (idx, row) in enumerate(ps_sorted.iterrows()):
+        ax6.text(row['P/S Ratio_numeric'] + 0.3, i, 
+                f"{row['P/S Ratio_numeric']:.2f}", 
+                va='center', fontsize=9)
+    
+    # 7. Price/Book Ratio (Position 7 - Row 3 Left)
+    ax7 = plt.subplot(4, 3, 7)
+    pb_sorted = df.sort_values('P/B Ratio_numeric', ascending=True)
+    bar_colors = [ticker_colors[ticker] for ticker in pb_sorted['Ticker']]
+    bars7 = ax7.barh(pb_sorted['Ticker'], pb_sorted['P/B Ratio_numeric'], color=bar_colors, alpha=0.7)
+    ax7.set_xlabel('Price/Book Ratio')
+    ax7.set_title('Price/Book (MRQ)', fontweight='bold')
+    ax7.grid(axis='x', alpha=0.3)
+    
+    for i, (idx, row) in enumerate(pb_sorted.iterrows()):
+        ax7.text(row['P/B Ratio_numeric'] + 1, i, 
+                f"{row['P/B Ratio_numeric']:.2f}", 
+                va='center', fontsize=9)
+    
+    for i, (idx, row) in enumerate(pb_sorted.iterrows()):
+        ax7.text(row['P/B Ratio_numeric'] + 1, i, 
+                f"{row['P/B Ratio_numeric']:.2f}", 
+                va='center', fontsize=9)
+    
+    # 8. Enterprise Value/Revenue (Position 8 - Row 3 Center)
+    ax8 = plt.subplot(4, 3, 8)
+    evr_sorted = df.sort_values('Enterprise Value/Revenue_numeric', ascending=True)
+    bar_colors = [ticker_colors[ticker] for ticker in evr_sorted['Ticker']]
+    bars8 = ax8.barh(evr_sorted['Ticker'], evr_sorted['Enterprise Value/Revenue_numeric'], 
+                     color=bar_colors, alpha=0.7)
+    ax8.set_xlabel('EV/Revenue Ratio')
+    ax8.set_title('Enterprise Value / Revenue', fontweight='bold')
+    ax8.grid(axis='x', alpha=0.3)
+    
+    for i, (idx, row) in enumerate(evr_sorted.iterrows()):
+        ax8.text(row['Enterprise Value/Revenue_numeric'] + 0.3, i, 
+                f"{row['Enterprise Value/Revenue_numeric']:.2f}", 
+                va='center', fontsize=9)
+    
+    # 9. Enterprise Value/EBITDA (Position 9 - Row 3 Right)
+    ax9 = plt.subplot(4, 3, 9)
+    evebitda_sorted = df.sort_values('Enterprise Value/EBITDA_numeric', ascending=True)
+    bar_colors = [ticker_colors[ticker] for ticker in evebitda_sorted['Ticker']]
+    bars9 = ax9.barh(evebitda_sorted['Ticker'], 
+                     evebitda_sorted['Enterprise Value/EBITDA_numeric'], color=bar_colors, alpha=0.7)
+    ax9.set_xlabel('EV/EBITDA Ratio')
+    ax9.set_title('Enterprise Value / EBITDA', fontweight='bold')
+    ax9.grid(axis='x', alpha=0.3)
+    
+    for i, (idx, row) in enumerate(evebitda_sorted.iterrows()):
+        ax9.text(row['Enterprise Value/EBITDA_numeric'] + 2, i, 
+                f"{row['Enterprise Value/EBITDA_numeric']:.2f}", 
+                va='center', fontsize=9)
+    
+    # 10. Valuation Multiples Heatmap (Bottom Row - spanning 3 columns)
+    ax10 = plt.subplot(4, 3, (10, 12))
+    
+    # Create heatmap data including PEG Ratio
+    heatmap_cols = ['Trailing P/E_numeric', 'Forward P/E_numeric', 'VCR_numeric', 'PEG Ratio_numeric',
+                    'P/S Ratio_numeric', 'P/B Ratio_numeric',
+                    'Enterprise Value/Revenue_numeric', 'Enterprise Value/EBITDA_numeric']
+    heatmap_labels = ['Trailing P/E', 'Forward P/E', 'VCR', 'PEG', 'P/S', 'P/B', 'EV/Rev', 'EV/EBITDA']
+    
+    heatmap_data = df.set_index('Ticker')[heatmap_cols].copy()
+    heatmap_data.columns = heatmap_labels
+    
+    # Normalize each column for better visualization (0-1 scale)
+    heatmap_normalized = (heatmap_data - heatmap_data.min()) / (heatmap_data.max() - heatmap_data.min())
+    
+    sns.heatmap(heatmap_normalized.T, annot=heatmap_data.T, fmt='.2f', 
+                cmap='RdYlGn_r', cbar_kws={'label': 'Relative Valuation'}, 
+                ax=ax10, linewidths=0.5)
+    ax10.set_title('Valuation Multiples Heatmap (Lower = Better Value)', fontweight='bold')
+    ax10.set_xlabel('')
+    ax10.set_ylabel('Metric')
+    
+    plt.tight_layout()
+    
+    # Create pic directory if it doesn't exist
+    pic_dir = 'pic'
+    os.makedirs(pic_dir, exist_ok=True)
+    
+    # Generate filename with timestamp and data source
+    timestamp = datetime.now().strftime('%Y_%m%d')
+    data_source = df['Data_Source'].iloc[0] if 'Data_Source' in df.columns else 'yahoo_finance'
+    
+    # Add version suffix if filtered
+    if len(df) < 7:
+        excluded = list(set(['AAPL', 'MSFT', 'GOOG', 'AMZN', 'META', 'NVDA', 'TSLA']) - set(df['Ticker'].tolist()))
+        suffix = '_v2'
+        #! Commented out this
+        # suffix = f"_v2_no_{'_'.join(excluded)}"
+    else:
+        suffix = '_v1'
+    
+    output_file = os.path.join(pic_dir, f'{data_source}_{timestamp}{suffix}.png')
+    
+    # Save the figure
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    print(f"\n✓ Saved comprehensive visualization to: {output_file}")
+    
+    return fig
+
+
+def create_consolidated_visualizations(df_full, version='v1'):
+    """Create consolidated visualizations comparing Yahoo Finance vs StockAnalysis
+    
+    Args:
+        df_full: Full dataframe with both data sources
+        version: 'v1' for all companies, 'v2' for filtered (no TSLA)
+    """
+    # Filter data for both sources
+    df_yahoo = df_full[df_full['Data_Source'] == 'yahoo_finance'].copy()
+    df_sa = df_full[df_full['Data_Source'] == 'stockanalysis'].copy()
+    
+    # Merge on Ticker to get side-by-side comparison
+    df_merged = pd.merge(df_yahoo, df_sa, on='Ticker', suffixes=('_yahoo', '_sa'))
+    
+    # Create figure with 6 subplots (2x3)
+    fig, axes = plt.subplots(2, 3, figsize=(20, 12))
+    
+    # Get fetch date from the data
+    fetch_date = df_full['Fetch_Date'].iloc[0] if 'Fetch_Date' in df_full.columns else datetime.now().strftime('%Y-%m-%d')
+    
+    # Determine title based on version
+    if version == 'v2':
+        title = f'Consolidated Valuation Comparison\nYahoo Finance vs StockAnalysis\nMagnificent 6 (w/o TSLA)\n(Data: {fetch_date}, Sources: yahoo_finance + stockanalysis)'
+    else:
+        title = f'Consolidated Valuation Comparison\nYahoo Finance vs StockAnalysis\nMagnificent 7\n(Data: {fetch_date}, Sources: yahoo_finance + stockanalysis)'
+    
+    fig.suptitle(title, fontsize=16, fontweight='bold')
+    
+    # Define the 6 metrics to visualize (in display order)
+    metrics = [
+        ('Trailing P/E', 'Trailing P/E_numeric'),   # Fig 01
+        ('Forward P/E', 'Forward P/E_numeric'),     # Fig 02
+        ('VCR', 'VCR_numeric'),                     # Fig 03
+        ('PEG Ratio', 'PEG Ratio_numeric'),         # Fig 04
+        ('P/S Ratio', 'P/S Ratio_numeric'),         # Fig 05
+        ('P/B Ratio', 'P/B Ratio_numeric')          # Fig 06
+    ]
+    
+    # Color scheme
+    colors_yahoo = '#1f77b4'  # Blue
+    colors_sa = '#ff7f0e'     # Orange
+    
+    for idx, (title, col_base) in enumerate(metrics):
+        ax = axes[idx // 3, idx % 3]
+        
+        col_yahoo = col_base + '_yahoo'
+        col_sa = col_base + '_sa'
+        
+        # Sort by Yahoo Finance values
+        df_plot = df_merged.sort_values(col_yahoo, ascending=True).dropna(subset=[col_yahoo])
+        
+        x = np.arange(len(df_plot))
+        width = 0.35
+        
+        # Plot bars
+        bars1 = ax.barh(x - width/2, df_plot[col_yahoo], width, 
+                        label='Yahoo Finance', color=colors_yahoo, alpha=0.8)
+        bars2 = ax.barh(x + width/2, df_plot[col_sa], width, 
+                        label='StockAnalysis', color=colors_sa, alpha=0.8)
+        
+        ax.set_xlabel(title)
+        ax.set_title(f'{title} Comparison', fontweight='bold')
+        ax.set_yticks(x)
+        ax.set_yticklabels(df_plot['Ticker'])
+        ax.legend(loc='best')
+        ax.grid(axis='x', alpha=0.3)
+        
+        # Add value labels (adjust format for VCR which uses 3 decimals)
+        for i, (_, row) in enumerate(df_plot.iterrows()):
+            if not pd.isna(row[col_yahoo]):
+                if title == 'VCR':
+                    label_text = f"{row[col_yahoo]:.3f}"
+                    offset = 0.02
+                else:
+                    label_text = f"{row[col_yahoo]:.2f}"
+                    offset = 0.5
+                ax.text(row[col_yahoo] + offset, i - width/2, label_text, 
+                       va='center', fontsize=8, color=colors_yahoo)
+            if not pd.isna(row[col_sa]):
+                if title == 'VCR':
+                    label_text = f"{row[col_sa]:.3f}"
+                    offset = 0.02
+                else:
+                    label_text = f"{row[col_sa]:.2f}"
+                    offset = 0.5
+                ax.text(row[col_sa] + offset, i + width/2, label_text, 
+                       va='center', fontsize=8, color=colors_sa)
+    
+    plt.tight_layout()
+    
+    # Create pic directory if it doesn't exist
+    pic_dir = 'pic'
+    os.makedirs(pic_dir, exist_ok=True)
+    
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime('%Y_%m%d')
+    output_file = os.path.join(pic_dir, f'consolidated_separated_{timestamp}_{version}.png')
+    
+    # Save the figure
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    print(f"\n✓ Saved consolidated visualization to: {output_file}")
+    
+    return fig
+
+
+def create_consolidated_mean_visualizations(df_full, version='v1'):
+    """Create consolidated mean visualizations showing average of both sources
+    
+    Args:
+        df_full: Full dataframe with both data sources
+        version: 'v1' for all companies, 'v2' for filtered (no TSLA)
+    """
+    # Filter data for both sources
+    df_yahoo = df_full[df_full['Data_Source'] == 'yahoo_finance'].copy()
+    df_sa = df_full[df_full['Data_Source'] == 'stockanalysis'].copy()
+    
+    # Merge on Ticker to get side-by-side comparison
+    df_merged = pd.merge(df_yahoo, df_sa, on='Ticker', suffixes=('_yahoo', '_sa'))
+    
+    # Get fetch date from the data
+    fetch_date = df_full['Fetch_Date'].iloc[0] if 'Fetch_Date' in df_full.columns else datetime.now().strftime('%Y-%m-%d')
+    
+    # Create consistent color mapping for each company
+    all_tickers = sorted(df_merged['Ticker'].unique())
+    color_palette = sns.color_palette("husl", len(all_tickers))
+    ticker_colors = {ticker: color_palette[i] for i, ticker in enumerate(all_tickers)}
+    
+    # Create figure with 6 subplots (2x3)
+    fig, axes = plt.subplots(2, 3, figsize=(20, 12))
+    
+    # Determine title based on version
+    if version == 'v2':
+        title = f'Consolidated Mean Valuation\nAverage of Yahoo Finance & StockAnalysis\nMagnificent 6 (w/o TSLA)\n(Data: {fetch_date}, Sources: yahoo_finance + stockanalysis)'
+    else:
+        title = f'Consolidated Mean Valuation\nAverage of Yahoo Finance & StockAnalysis\nMagnificent 7\n(Data: {fetch_date}, Sources: yahoo_finance + stockanalysis)'
+    
+    fig.suptitle(title, fontsize=16, fontweight='bold')
+    
+    # Define the 6 metrics to visualize (in display order)
+    metrics = [
+        ('Trailing P/E', 'Trailing P/E_numeric'),   # Fig 01
+        ('Forward P/E', 'Forward P/E_numeric'),     # Fig 02
+        ('VCR', 'VCR_numeric'),                     # Fig 03
+        ('PEG Ratio', 'PEG Ratio_numeric'),         # Fig 04
+        ('P/S Ratio', 'P/S Ratio_numeric'),         # Fig 05
+        ('P/B Ratio', 'P/B Ratio_numeric')          # Fig 06
+    ]
+    
+    for idx, (title_text, col_base) in enumerate(metrics):
+        ax = axes[idx // 3, idx % 3]
+        
+        col_yahoo = col_base + '_yahoo'
+        col_sa = col_base + '_sa'
+        
+        # Calculate mean of both sources
+        df_merged[f'{col_base}_mean'] = df_merged[[col_yahoo, col_sa]].mean(axis=1)
+        
+        # Sort by mean values
+        df_plot = df_merged.sort_values(f'{col_base}_mean', ascending=True).dropna(subset=[f'{col_base}_mean'])
+        
+        x = np.arange(len(df_plot))
+        
+        # Get colors for each company
+        bar_colors = [ticker_colors[ticker] for ticker in df_plot['Ticker']]
+        
+        # Plot bars
+        bars = ax.barh(df_plot['Ticker'], df_plot[f'{col_base}_mean'], color=bar_colors, alpha=0.7)
+        
+        ax.set_xlabel(f'{title_text} (Mean)')
+        ax.set_title(f'{title_text}', fontweight='bold')
+        ax.grid(axis='x', alpha=0.3)
+        
+        # Add value labels (adjust format for VCR which uses 3 decimals)
+        for i, (_, row) in enumerate(df_plot.iterrows()):
+            if not pd.isna(row[f'{col_base}_mean']):
+                if title_text == 'VCR':
+                    label_text = f"{row[f'{col_base}_mean']:.3f}"
+                    offset = 0.02
+                else:
+                    label_text = f"{row[f'{col_base}_mean']:.2f}"
+                    offset = 0.5
+                ax.text(row[f'{col_base}_mean'] + offset, i, label_text, 
+                       va='center', fontsize=9, fontweight='bold')
+    
+    plt.tight_layout()
+    
+    # Create pic directory if it doesn't exist
+    pic_dir = 'pic'
+    os.makedirs(pic_dir, exist_ok=True)
+    
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime('%Y_%m%d')
+    output_file = os.path.join(pic_dir, f'consolidated_mean_{timestamp}_{version}.png')
+    
+    # Save the figure
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    print(f"\n✓ Saved consolidated mean visualization to: {output_file}")
+    
+    return fig
+
+
+def create_summary_stats(df):
+    """Print summary statistics"""
+    print("\n" + "="*80)
+    print("MAGNIFICENT 7 - VALUATION MEASURES SUMMARY")
+    print("="*80)
+    
+    print("\n📊 MARKET CAPITALIZATION RANKINGS:")
+    print("-" * 80)
+    mc_sorted = df.sort_values('Market Cap_numeric', ascending=False)
+    for idx, row in mc_sorted.iterrows():
+        print(f"  {row['Ticker']:6s} - {row['Market Cap']}")
+    
+    print("\n💰 VALUATION MULTIPLES - HIGHEST TO LOWEST:")
+    print("-" * 80)
+    
+    metrics = [
+        ('Trailing P/E', 'Trailing P/E_numeric'),
+        ('Forward P/E', 'Forward P/E_numeric'),
+        ('VCR (Valuation Compression Ratio)', 'VCR_numeric'),
+        ('PEG Ratio', 'PEG Ratio_numeric'),
+        ('Price/Sales', 'P/S Ratio_numeric'),
+        ('Price/Book', 'P/B Ratio_numeric'),
+        ('EV/Revenue', 'Enterprise Value/Revenue_numeric'),
+        ('EV/EBITDA', 'Enterprise Value/EBITDA_numeric')
+    ]
+    
+    for label, col in metrics:
+        sorted_df = df.sort_values(col, ascending=False).dropna(subset=[col])
+        print(f"\n  {label}:")
+        for idx, row in sorted_df.iterrows():
+            val = row[col]
+            print(f"    {row['Ticker']:6s} - {val:8.2f}")
+    
+    print("\n" + "="*80)
+
+
+def main():
+    """Main execution function"""
+    print("="*80)
+    print("VALUATION MEASURES VISUALIZATION")
+    print("="*80)
+    
+    # Part 1: Yahoo Finance visualizations (v1 & v2)
+    print("\n[1/6] Creating Yahoo Finance visualizations...")
+    print("-"*80)
+    df_yahoo = load_and_prepare_data(data_source='yahoo_finance')
+    
+    print(f"Loaded Yahoo Finance data for {len(df_yahoo)} companies: {', '.join(df_yahoo['Ticker'].tolist())}")
+    
+    print("\nCreating Yahoo Finance v1 (all 7 companies)...")
+    fig1 = create_visualizations(df_yahoo)
+    
+    create_summary_stats(df_yahoo)
+    
+    print("\n✓ Yahoo Finance v1 complete!")
+    
+    # Create version without TSLA (filtered for better scale)
+    print("\nCreating Yahoo Finance v2 (without TSLA for better scale)...")
+    df_yahoo_filtered = df_yahoo[df_yahoo['Ticker'] != 'TSLA'].copy()
+    print(f"Filtered data: {', '.join(df_yahoo_filtered['Ticker'].tolist())}")
+    
+    fig2 = create_visualizations(df_yahoo_filtered)
+    
+    print("\n✓ Yahoo Finance v2 (without TSLA) complete!")
+    
+    # Part 2: Consolidated visualizations
+    print("\n" + "="*80)
+    print("[2/6] Creating Consolidated visualizations (Yahoo + StockAnalysis)...")
+    print("-"*80)
+    
+    df_full = load_and_prepare_data(data_source='both')
+    print(f"Loaded data from both sources:")
+    print(f"  - Yahoo Finance: {len(df_full[df_full['Data_Source']=='yahoo_finance'])} companies")
+    print(f"  - StockAnalysis: {len(df_full[df_full['Data_Source']=='stockanalysis'])} companies")
+    
+    print("\nCreating Consolidated v1 (all 7 companies)...")
+    fig3 = create_consolidated_visualizations(df_full, version='v1')
+    
+    print("\n✓ Consolidated v1 complete!")
+    
+    # Part 3: Consolidated v2 without TSLA
+    print("\nCreating Consolidated v2 (without TSLA for better scale)...")
+    df_full_filtered = df_full[df_full['Ticker'] != 'TSLA'].copy()
+    print(f"Filtered data: {', '.join(sorted(df_full_filtered['Ticker'].unique()))}")
+    
+    fig4 = create_consolidated_visualizations(df_full_filtered, version='v2')
+    
+    print("\n✓ Consolidated v2 (without TSLA) complete!")
+    
+    # Part 3: Consolidated Mean visualizations
+    print("\n" + "="*80)
+    print("[3/6] Creating Consolidated Mean visualizations (Average of both sources)...")
+    print("-"*80)
+    
+    print("\nCreating Consolidated Mean v1 (all 7 companies)...")
+    fig5 = create_consolidated_mean_visualizations(df_full, version='v1')
+    
+    print("\n✓ Consolidated Mean v1 complete!")
+    
+    print("\nCreating Consolidated Mean v2 (without TSLA for better scale)...")
+    fig6 = create_consolidated_mean_visualizations(df_full_filtered, version='v2')
+    
+    print("\n✓ Consolidated Mean v2 (without TSLA) complete!")
+    
+    # Summary
+    print("\n" + "="*80)
+    print("SUMMARY")
+    print("="*80)
+    print("\n✓ All visualizations have been saved to the ./pic/ folder:")
+    print("  1. Yahoo Finance v1 (all 7 companies)")
+    print("  2. Yahoo Finance v2 (without TSLA)")
+    print("  3. Consolidated v1 (6 key metrics from both sources - all 7 companies)")
+    print("  4. Consolidated v2 (6 key metrics from both sources - without TSLA)")
+    print("  5. Consolidated Mean v1 (average of both sources - all 7 companies)")
+    print("  6. Consolidated Mean v2 (average of both sources - without TSLA)")
+    print("\n📊 Consolidated metrics: Trailing P/E, Forward P/E, PEG Ratio, P/S Ratio, P/B Ratio, VCR")
+    print("\nVisualization complete! 🎉")
+    
+    # Show the plot
+    # plt.show()
+
+
+if __name__ == "__main__":
+    main()
