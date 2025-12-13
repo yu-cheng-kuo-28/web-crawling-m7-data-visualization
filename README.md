@@ -46,7 +46,13 @@ Each visualization includes date stamps and data source attribution.
 ## Project Structure
 
 ```
-├── s00_term_conversion_table.csv   # Metric name standardization mapping
+├── config/
+│   ├── 01_config_fetch.yaml         # Stock tickers to fetch (customizable)
+│   ├── 02_config_visualize.yaml     # Visualization settings (customizable)
+│   └── CONFIG_GUIDE.md              # Configuration documentation
+├── tool/
+│   ├── term_conversion_table.csv    # Metric name standardization mapping
+│   └── requirements.txt             # Python dependencies
 ├── s01_fetch_data.py                # Data collection script
 ├── s02_visualize.py                 # Visualization generation
 ├── csv/                             # Output data files
@@ -58,17 +64,30 @@ Each visualization includes date stamps and data source attribution.
 
 ## Usage
 
-1. **Fetch Data**:
+### Quick Start
+
+1. **Configure Stocks** (Optional):
+   Edit `config/01_config_fetch.yaml` to customize which stocks to fetch:
+   ```yaml
+   tickers:
+     - AAPL
+     - MSFT
+     - GOOG
+     # Add more tickers here
+   ```
+   See [config/CONFIG_GUIDE.md](config/CONFIG_GUIDE.md) for detailed configuration options.
+
+2. **Fetch Data**:
    ```bash
    python s01_fetch_data.py
    ```
-   Generates CSV files with timestamped valuation data.
+   Generates CSV files with timestamped valuation data for all configured stocks.
 
-2. **Create Visualizations**:
+3. **Create Visualizations**:
    ```bash
    python s02_visualize.py
    ```
-   Generates 6 PNG files with comprehensive charts.
+   Generates PNG files with comprehensive charts for all stocks in the CSV data.
 
 ## Requirements
 
@@ -78,12 +97,13 @@ Each visualization includes date stamps and data source attribution.
 - pandas 2.3.1
 - matplotlib 3.8.2
 - seaborn 0.13.2
+- pyyaml 6.0+
 - Chrome WebDriver (for Selenium)
 
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+pip install -r tool/requirements.txt
 ```
 
 ## Output Files
@@ -106,9 +126,45 @@ pip install -r requirements.txt
 ✅ Rate limiting for polite web scraping  
 ✅ Consolidated terminology across data sources  
 
+## Customization
+
+You can easily track different stocks by editing the configuration files:
+
+**config/01_config_fetch.yaml** - Controls which tickers to fetch:
+```yaml
+tickers:
+  - AAPL
+  - MSFT
+  - YOUR_TICKER_HERE
+```
+
+**config/02_config_visualize.yaml** - Controls visualization settings:
+
+### Track Different Stocks
+```yaml
+tickers:
+  - NFLX
+  - AMD
+  - INTC
+  # Add any stock ticker
+```
+
+### Filter Visualizations
+```yaml
+exclude_from_visualizations:
+  - TSLA  # Exclude from v2 charts
+  
+visualization:
+  create_filtered_version: true
+  filtered_version_label: "w/o TSLA"
+```
+
+See [config/CONFIG_GUIDE.md](config/CONFIG_GUIDE.md) for more examples.
+
 ## Notes
 
-- **v1 files**: Include all 7 companies
-- **v2 files**: Exclude TSLA for better scale visualization
+- **v1 files**: Include all configured companies
+- **v2 files**: Exclude specified tickers for better scale visualization (configurable)
 - Data is fetched with date stamps for historical tracking
+- Default configuration tracks Magnificent 7 stocks
 - StockAnalysis.com scraping runs in headless Chrome mode

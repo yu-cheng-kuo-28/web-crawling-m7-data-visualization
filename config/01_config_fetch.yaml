@@ -1,0 +1,38 @@
+# Fetch Configuration for s01_fetch_data.py
+# Defines which stock tickers to fetch data for
+
+# List of stock tickers to fetch data for
+# Add or remove tickers as needed - data will be fetched from Yahoo Finance and StockAnalysis
+tickers:
+  # Magnificent 7
+  - AAPL
+  - MSFT
+  - GOOG
+  - AMZN
+  - META
+  - NVDA
+  - TSLA
+  
+  # Additional tech stocks
+  - AMD
+  - INTC
+  - CMCSA
+  - AVGO
+  - AMBA
+  - MRVL
+  - RMBS
+  - NFLX
+  
+  # Other stocks (uncomment to include)
+  # - CRM
+  # - ORCL
+  # - ADBE
+  # - QCOM
+  # - TXN
+  
+  # Financial stocks (uncomment to include)
+  # - JPM
+  # - BAC
+  # - WFC
+  # - GS
+  # - MS

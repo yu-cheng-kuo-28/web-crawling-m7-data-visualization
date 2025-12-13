@@ -10,11 +10,43 @@ import seaborn as sns
 import numpy as np
 from datetime import datetime
 import os
+import yaml
 
 # Set style for better-looking plots
 sns.set_style("whitegrid")
 plt.rcParams['figure.figsize'] = (14, 10)
 plt.rcParams['font.size'] = 10
+
+
+def load_config():
+    """Load configuration from config/02_config_visualize.yaml."""
+    config_file = 'config/02_config_visualize.yaml'
+    
+    default_config = {
+        'tickers': [],  # Empty means use all from CSV
+        'exclude_from_visualizations': ["TSLA"],
+        'visualization': {
+            'create_filtered_version': True,
+            'filtered_version_label': 'w/o TSLA'
+        }
+    }
+    
+    if not os.path.exists(config_file):
+        print(f"Warning: {config_file} not found, using default configuration")
+        return default_config
+    
+    with open(config_file, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # Merge with defaults
+    if 'visualization' not in config:
+        config['visualization'] = default_config['visualization']
+    if 'exclude_from_visualizations' not in config:
+        config['exclude_from_visualizations'] = default_config['exclude_from_visualizations']
+    if 'tickers' not in config:
+        config['tickers'] = default_config['tickers']
+    
+    return config
 
 
 def parse_value(val):
@@ -64,6 +96,13 @@ def load_and_prepare_data(csv_file='csv/valuation_measures_current.csv', data_so
     df['VCR_numeric'] = df['Forward P/E_numeric'] / df['Trailing P/E_numeric']
     df['VCR'] = df['VCR_numeric'].apply(lambda x: f"{x:.3f}" if not pd.isna(x) else "N/A")
     
+    # Filter by configured tickers if specified
+    config = load_config()
+    if config.get('tickers') and len(config['tickers']) > 0:
+        df = df[df['Ticker'].isin(config['tickers'])].copy()
+        if not df.empty:
+            print(f"Filtered to configured tickers: {', '.join(sorted(df['Ticker'].unique()))}")
+    
     return df
 
 
@@ -79,10 +118,21 @@ def create_visualizations(df, version_suffix=''):
     
     # Determine title based on companies included
     company_list = ', '.join(sorted(df['Ticker'].tolist()))
-    if len(df) < 7:
-        title = f'Valuation Measures Comparison\nMagnificent 6 (w/o TSLA)\n(Data: {fetch_date}, Source: {data_source})'
+    num_companies = len(df)
+    
+    # Load config to check for label
+    config = load_config()
+    exclude_tickers = config.get('exclude_from_visualizations', [])
+    
+    # Check if this is a filtered version
+    all_tickers = config.get('tickers', [])
+    is_filtered = num_companies < len(all_tickers)
+    
+    if is_filtered and exclude_tickers:
+        excluded_list = ', '.join(exclude_tickers)
+        title = f'Valuation Measures Comparison\n{num_companies} Companies (excluding {excluded_list})\n(Data: {fetch_date}, Source: {data_source})'
     else:
-        title = f'Valuation Measures Comparison\nMagnificent 7\n(Data: {fetch_date}, Source: {data_source})'
+        title = f'Valuation Measures Comparison\n{num_companies} Companies\n(Data: {fetch_date}, Source: {data_source})'
     
     fig.suptitle(title, fontsize=16, fontweight='bold', y=0.995)
     
@@ -354,10 +404,15 @@ def create_consolidated_visualizations(df_full, version='v1'):
     fetch_date = df_full['Fetch_Date'].iloc[0] if 'Fetch_Date' in df_full.columns else datetime.now().strftime('%Y-%m-%d')
     
     # Determine title based on version
+    num_companies = len(df_merged)
+    config = load_config()
+    
     if version == 'v2':
-        title = f'Consolidated Valuation Comparison\nYahoo Finance vs StockAnalysis\nMagnificent 6 (w/o TSLA)\n(Data: {fetch_date}, Sources: yahoo_finance + stockanalysis)'
+        exclude_tickers = config.get('exclude_from_visualizations', [])
+        excluded_list = ', '.join(exclude_tickers) if exclude_tickers else ''
+        title = f'Consolidated Valuation Comparison\nYahoo Finance vs StockAnalysis\n{num_companies} Companies (excluding {excluded_list})\n(Data: {fetch_date}, Sources: yahoo_finance + stockanalysis)'
     else:
-        title = f'Consolidated Valuation Comparison\nYahoo Finance vs StockAnalysis\nMagnificent 7\n(Data: {fetch_date}, Sources: yahoo_finance + stockanalysis)'
+        title = f'Consolidated Valuation Comparison\nYahoo Finance vs StockAnalysis\n{num_companies} Companies\n(Data: {fetch_date}, Sources: yahoo_finance + stockanalysis)'
     
     fig.suptitle(title, fontsize=16, fontweight='bold')
     
@@ -476,10 +531,15 @@ def create_consolidated_mean_visualizations(df_full, version='v1'):
     fig, axes = plt.subplots(2, 3, figsize=(20, 12))
     
     # Determine title based on version
+    num_companies = len(df_merged)
+    config = load_config()
+    
     if version == 'v2':
-        title = f'Consolidated Mean Valuation\nAverage of Yahoo Finance & StockAnalysis\nMagnificent 6 (w/o TSLA)\n(Data: {fetch_date}, Sources: yahoo_finance + stockanalysis)'
+        exclude_tickers = config.get('exclude_from_visualizations', [])
+        excluded_list = ', '.join(exclude_tickers) if exclude_tickers else ''
+        title = f'Consolidated Mean Valuation\nAverage of Yahoo Finance & StockAnalysis\n{num_companies} Companies (excluding {excluded_list})\n(Data: {fetch_date}, Sources: yahoo_finance + stockanalysis)'
     else:
-        title = f'Consolidated Mean Valuation\nAverage of Yahoo Finance & StockAnalysis\nMagnificent 7\n(Data: {fetch_date}, Sources: yahoo_finance + stockanalysis)'
+        title = f'Consolidated Mean Valuation\nAverage of Yahoo Finance & StockAnalysis\n{num_companies} Companies\n(Data: {fetch_date}, Sources: yahoo_finance + stockanalysis)'
     
     fig.suptitle(title, fontsize=16, fontweight='bold')
     
@@ -617,14 +677,23 @@ def main():
     
     print("\n✓ Yahoo Finance v1 complete!")
     
-    # Create version without TSLA (filtered for better scale)
-    print("\nCreating Yahoo Finance v2 (without TSLA for better scale)...")
-    df_yahoo_filtered = df_yahoo[df_yahoo['Ticker'] != 'TSLA'].copy()
-    print(f"Filtered data: {', '.join(df_yahoo_filtered['Ticker'].tolist())}")
+    # Load config for filtering
+    config = load_config()
     
-    fig2 = create_visualizations(df_yahoo_filtered)
-    
-    print("\n✓ Yahoo Finance v2 (without TSLA) complete!")
+    # Create filtered version if configured
+    if config['visualization']['create_filtered_version']:
+        exclude_tickers = config['exclude_from_visualizations']
+        label = config['visualization']['filtered_version_label']
+        
+        print(f"\nCreating Yahoo Finance v2 ({label} for better scale)...")
+        df_yahoo_filtered = df_yahoo[~df_yahoo['Ticker'].isin(exclude_tickers)].copy()
+        print(f"Filtered data: {', '.join(df_yahoo_filtered['Ticker'].tolist())}")
+        
+        fig2 = create_visualizations(df_yahoo_filtered)
+        
+        print(f"\n✓ Yahoo Finance v2 ({label}) complete!")
+    else:
+        print("\nSkipping filtered version (create_filtered_version=false in config)")
     
     # Part 2: Consolidated visualizations
     print("\n" + "="*80)
@@ -641,41 +710,55 @@ def main():
     
     print("\n✓ Consolidated v1 complete!")
     
-    # Part 3: Consolidated v2 without TSLA
-    print("\nCreating Consolidated v2 (without TSLA for better scale)...")
-    df_full_filtered = df_full[df_full['Ticker'] != 'TSLA'].copy()
-    print(f"Filtered data: {', '.join(sorted(df_full_filtered['Ticker'].unique()))}")
+    # Part 3: Consolidated v2 filtered
+    if config['visualization']['create_filtered_version']:
+        exclude_tickers = config['exclude_from_visualizations']
+        label = config['visualization']['filtered_version_label']
+        
+        print(f"\nCreating Consolidated v2 ({label} for better scale)...")
+        df_full_filtered = df_full[~df_full['Ticker'].isin(exclude_tickers)].copy()
+        print(f"Filtered data: {', '.join(sorted(df_full_filtered['Ticker'].unique()))}")
+        
+        fig4 = create_consolidated_visualizations(df_full_filtered, version='v2')
     
-    fig4 = create_consolidated_visualizations(df_full_filtered, version='v2')
-    
-    print("\n✓ Consolidated v2 (without TSLA) complete!")
+        print(f"\n✓ Consolidated v2 ({label}) complete!")
     
     # Part 3: Consolidated Mean visualizations
     print("\n" + "="*80)
     print("[3/6] Creating Consolidated Mean visualizations (Average of both sources)...")
     print("-"*80)
     
-    print("\nCreating Consolidated Mean v1 (all 7 companies)...")
+    num_companies = len(df_full['Ticker'].unique())
+    print(f"\nCreating Consolidated Mean v1 (all {num_companies} companies)...")
     fig5 = create_consolidated_mean_visualizations(df_full, version='v1')
     
     print("\n✓ Consolidated Mean v1 complete!")
     
-    print("\nCreating Consolidated Mean v2 (without TSLA for better scale)...")
-    fig6 = create_consolidated_mean_visualizations(df_full_filtered, version='v2')
-    
-    print("\n✓ Consolidated Mean v2 (without TSLA) complete!")
+    if config['visualization']['create_filtered_version']:
+        print(f"\nCreating Consolidated Mean v2 ({label} for better scale)...")
+        fig6 = create_consolidated_mean_visualizations(df_full_filtered, version='v2')
+        
+        print(f"\n✓ Consolidated Mean v2 ({label}) complete!")
     
     # Summary
     print("\n" + "="*80)
     print("SUMMARY")
     print("="*80)
     print("\n✓ All visualizations have been saved to the ./pic/ folder:")
-    print("  1. Yahoo Finance v1 (all 7 companies)")
-    print("  2. Yahoo Finance v2 (without TSLA)")
-    print("  3. Consolidated v1 (6 key metrics from both sources - all 7 companies)")
-    print("  4. Consolidated v2 (6 key metrics from both sources - without TSLA)")
-    print("  5. Consolidated Mean v1 (average of both sources - all 7 companies)")
-    print("  6. Consolidated Mean v2 (average of both sources - without TSLA)")
+    
+    num_companies = len(df_yahoo)
+    label = config['visualization']['filtered_version_label'] if config['visualization']['create_filtered_version'] else ''
+    
+    print(f"  1. Yahoo Finance v1 (all {num_companies} companies)")
+    if config['visualization']['create_filtered_version']:
+        print(f"  2. Yahoo Finance v2 ({label})")
+        print(f"  3. Consolidated v1 (6 key metrics from both sources - all {num_companies} companies)")
+        print(f"  4. Consolidated v2 (6 key metrics from both sources - {label})")
+        print(f"  5. Consolidated Mean v1 (average of both sources - all {num_companies} companies)")
+        print(f"  6. Consolidated Mean v2 (average of both sources - {label})")
+    else:
+        print(f"  2. Consolidated v1 (6 key metrics from both sources - all {num_companies} companies)")
+        print(f"  3. Consolidated Mean v1 (average of both sources - all {num_companies} companies)")
     print("\n📊 Consolidated metrics: Trailing P/E, Forward P/E, PEG Ratio, P/S Ratio, P/B Ratio, VCR")
     print("\nVisualization complete! 🎉")
     

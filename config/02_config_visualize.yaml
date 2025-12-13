@@ -1,0 +1,27 @@
+# Visualization Configuration for s02_visualize.py
+# Defines which stocks to include in visualizations and filtering options
+
+# List of stock tickers to visualize
+# Must be a subset of tickers in config/01_config_fetch.yaml (i.e., data must exist in CSV)
+# Leave empty to visualize ALL tickers found in the CSV
+tickers: []  # Empty = use all tickers from CSV
+
+# Alternative: Specify exact tickers to visualize
+# tickers:
+#   - AAPL
+#   - MSFT
+#   - GOOG
+#   - AMZN
+#   - META
+#   - NVDA
+#   - TSLA
+
+# Tickers to exclude from filtered visualizations (v2 versions)
+# These will still appear in v1 versions but excluded from v2
+exclude_from_visualizations:
+  - TSLA  # Often has extreme values that compress the scale
+
+# Visualization settings
+visualization:
+  create_filtered_version: true  # If true, creates v2 versions excluding tickers above
+  filtered_version_label: "w/o TSLA"  # Label for filtered versions

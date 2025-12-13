@@ -21,9 +21,27 @@ from typing import List, Dict, Optional
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+import yaml
 
 
-MAG7_TICKERS = ["AAPL", "MSFT", "GOOG", "AMZN", "META", "NVDA", "TSLA"]
+def load_tickers_from_config() -> List[str]:
+    """Load stock tickers from config/01_config_fetch.yaml file."""
+    config_file = 'config/01_config_fetch.yaml'
+    
+    if not os.path.exists(config_file):
+        # Fallback to Magnificent 7 if config doesn't exist
+        print(f"Warning: {config_file} not found, using default Magnificent 7 tickers")
+        return ["AAPL", "MSFT", "GOOG", "AMZN", "META", "NVDA", "TSLA"]
+    
+    with open(config_file, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    tickers = config.get('tickers', [])
+    if not tickers:
+        print(f"Warning: No tickers found in {config_file}, using default Magnificent 7 tickers")
+        return ["AAPL", "MSFT", "GOOG", "AMZN", "META", "NVDA", "TSLA"]
+    
+    return tickers
 
 
 def load_term_conversion_table() -> Dict[str, Dict[str, str]]:
@@ -31,7 +49,7 @@ def load_term_conversion_table() -> Dict[str, Dict[str, str]]:
     Load the term conversion table to map source-specific terms to consolidated terms.
     Returns a dict with 'yahoo_finance' and 'stockanalysis' mappings.
     """
-    conversion_file = 's00_term_conversion_table.csv'
+    conversion_file = 'tool/term_conversion_table.csv'
     
     if not os.path.exists(conversion_file):
         # Return empty mappings if file doesn't exist
@@ -212,22 +230,42 @@ def crawl_magnificent7() -> None:
     # Load term conversion table
     term_mappings = load_term_conversion_table()
     
-    #! Check if data for today already exists in full CSV
+    # Load tickers from config
+    tickers = load_tickers_from_config()
+    print(f"\n📋 Loaded {len(tickers)} tickers from config: {', '.join(tickers)}")
+    
+    # Check which tickers already have data for today
     csv_dir = 'csv'
     full_csv = os.path.join(csv_dir, "valuation_measures_full.csv")
     
+    existing_tickers_today = set()
     if os.path.exists(full_csv):
         existing_full_df = pd.read_csv(full_csv)
         if not existing_full_df.empty:
-            # Check if today's data already exists
             today_data = existing_full_df[existing_full_df['Fetch_Date'] == fetch_date]
             if not today_data.empty:
-                print(f"\n✓ Data for {fetch_date} already exists in {full_csv}")
-                print("  Skipping fetch. Delete the rows for this date if you want to re-fetch.")
-                return
-
-    # Fetch from both Yahoo Finance and NASDAQ
-    for ticker in MAG7_TICKERS:
+                # Get unique tickers that have data from BOTH sources for today
+                ticker_counts = today_data.groupby('Ticker')['Data_Source'].nunique()
+                existing_tickers_today = set(ticker_counts[ticker_counts == 2].index)
+                
+                if existing_tickers_today:
+                    print(f"\n✓ Found existing data for {fetch_date}: {', '.join(sorted(existing_tickers_today))}")
+    
+    # Filter to only fetch missing tickers
+    tickers_to_fetch = [t for t in tickers if t not in existing_tickers_today]
+    
+    if not tickers_to_fetch:
+        print(f"\n✓ All {len(tickers)} tickers already have data for {fetch_date}")
+        print("  Nothing to fetch. Delete specific ticker rows if you want to re-fetch.")
+        return
+    
+    if existing_tickers_today:
+        print(f"\n📋 Will fetch {len(tickers_to_fetch)} missing tickers: {', '.join(tickers_to_fetch)}")
+    
+    tickers = tickers_to_fetch
+    
+    # Fetch from both Yahoo Finance and StockAnalysis (missing tickers only)
+    for ticker in tickers:
         print(f"\n{'='*60}")
         print(f"Processing {ticker}")
         print(f"{'='*60}")
