@@ -86,11 +86,11 @@ def create_visualizations(df, version_suffix=''):
     
     fig.suptitle(title, fontsize=16, fontweight='bold', y=0.995)
     
-    # Define consistent color mapping for each company (sub-figures 2-9)
+    # Define consistent color mapping for each company (sub-figures 2-9) using Tableau 10 colors
     # Sort tickers to ensure consistent color assignment
     all_tickers = sorted(df['Ticker'].unique())
-    color_palette = sns.color_palette("husl", len(all_tickers))
-    ticker_colors = {ticker: color_palette[i] for i, ticker in enumerate(all_tickers)}
+    tableau_colors = ['#4E79A7', '#F28E2B', '#E15759', '#76B7B2', '#59A14F', '#EDC948', '#B07AA1', '#FF9DA7', '#9C755F', '#BAB0AC']
+    ticker_colors = {ticker: tableau_colors[i % len(tableau_colors)] for i, ticker in enumerate(all_tickers)}
     
     # TOP 1: P/E Ratios Comparison (Position 1 - Top Left)
     ax1 = plt.subplot(4, 3, 1)
@@ -113,126 +113,151 @@ def create_visualizations(df, version_suffix=''):
     ax2 = plt.subplot(4, 3, 2)
     vcr_sorted = df.sort_values('VCR_numeric', ascending=True).dropna(subset=['VCR_numeric'])
     
-    # Use consistent colors for each company
+    # Use consistent colors for each company - lollipop chart
     bar_colors = [ticker_colors[ticker] for ticker in vcr_sorted['Ticker']]
-    bars2 = ax2.barh(vcr_sorted['Ticker'], vcr_sorted['VCR_numeric'], color=bar_colors, alpha=0.7)
+    y_pos = np.arange(len(vcr_sorted))
+    ax2.hlines(y=y_pos, xmin=0, xmax=vcr_sorted['VCR_numeric'], color='gray', alpha=0.4, linewidth=1)
+    ax2.scatter(vcr_sorted['VCR_numeric'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
     
-    ax2.set_xlabel('VCR Ratio (Forward P/E / Trailing P/E)')
+    ax2.set_xlabel('VCR Ratio (Forward P/E / Trailing P/E)', fontsize=10)
     ax2.set_title('VCR - Valuation Compression Ratio\n<1: Growth | >1: Decline', 
-                  fontweight='bold', fontsize=10)
-    ax2.axvline(x=1.0, color='black', linestyle='--', linewidth=1.5, label='VCR=1.0')
-    ax2.grid(axis='x', alpha=0.3)
-    ax2.legend(loc='best')
+                  fontweight='bold', fontsize=11)
+    ax2.axvline(x=1.0, color='#E15759', linestyle='--', linewidth=2, label='VCR=1.0')
+    ax2.set_yticks(y_pos)
+    ax2.set_yticklabels(vcr_sorted['Ticker'], fontsize=10)
+    ax2.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
+    ax2.legend(loc='best', fontsize=9)
     
     for i, (idx, row) in enumerate(vcr_sorted.iterrows()):
-        ax2.text(row['VCR_numeric'] + 0.02, i, 
+        ax2.text(row['VCR_numeric'] + 0.03, i, 
                 f"{row['VCR_numeric']:.3f}", 
-                va='center', fontsize=9)
+                va='center', fontsize=9, fontweight='bold')
     
     # TOP 3: PEG Ratio (Position 3 - Top Right)
     ax3 = plt.subplot(4, 3, 3)
     peg_sorted = df.sort_values('PEG Ratio_numeric', ascending=True).dropna(subset=['PEG Ratio_numeric'])
     bar_colors = [ticker_colors[ticker] for ticker in peg_sorted['Ticker']]
-    bars3 = ax3.barh(peg_sorted['Ticker'], peg_sorted['PEG Ratio_numeric'], color=bar_colors, alpha=0.7)
-    ax3.set_xlabel('PEG Ratio')
-    ax3.set_title('PEG Ratio (5yr expected)\nLower = Better Value', fontweight='bold', fontsize=10)
-    ax3.grid(axis='x', alpha=0.3)
+    y_pos = np.arange(len(peg_sorted))
+    ax3.hlines(y=y_pos, xmin=0, xmax=peg_sorted['PEG Ratio_numeric'], color='gray', alpha=0.4, linewidth=1)
+    ax3.scatter(peg_sorted['PEG Ratio_numeric'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax3.set_xlabel('PEG Ratio', fontsize=10)
+    ax3.set_title('PEG Ratio (5yr expected)\nLower = Better Value', fontweight='bold', fontsize=11)
+    ax3.set_yticks(y_pos)
+    ax3.set_yticklabels(peg_sorted['Ticker'], fontsize=10)
+    ax3.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
     for i, (idx, row) in enumerate(peg_sorted.iterrows()):
         ax3.text(row['PEG Ratio_numeric'] + 0.15, i, 
                 f"{row['PEG Ratio_numeric']:.2f}", 
-                va='center', fontsize=9)
+                va='center', fontsize=9, fontweight='bold')
     
     # 4. Market Cap Comparison (Position 4 - Row 2 Left)
     ax4 = plt.subplot(4, 3, 4)
     market_caps = df.sort_values('Market Cap_numeric', ascending=True)
     bar_colors = [ticker_colors[ticker] for ticker in market_caps['Ticker']]
-    bars4 = ax4.barh(market_caps['Ticker'], market_caps['Market Cap_numeric'] / 1e12, color=bar_colors, alpha=0.7)
-    ax4.set_xlabel('Market Cap (Trillions $)')
-    ax4.set_title('Market Capitalization', fontweight='bold')
-    ax4.grid(axis='x', alpha=0.3)
+    y_pos = np.arange(len(market_caps))
+    ax4.hlines(y=y_pos, xmin=0, xmax=market_caps['Market Cap_numeric'] / 1e12, color='gray', alpha=0.4, linewidth=1)
+    ax4.scatter(market_caps['Market Cap_numeric'] / 1e12, y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax4.set_xlabel('Market Cap (Trillions $)', fontsize=10)
+    ax4.set_title('Market Capitalization', fontweight='bold', fontsize=11)
+    ax4.set_yticks(y_pos)
+    ax4.set_yticklabels(market_caps['Ticker'], fontsize=10)
+    ax4.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
     for i, (idx, row) in enumerate(market_caps.iterrows()):
-        ax4.text(row['Market Cap_numeric'] / 1e12 + 0.05, i, 
+        ax4.text(row['Market Cap_numeric'] / 1e12 + 0.08, i, 
                 f"${row['Market Cap_numeric']/1e12:.2f}T", 
-                va='center', fontsize=9)
+                va='center', fontsize=9, fontweight='bold')
     
     # 5. Enterprise Value Comparison (Position 5 - Row 2 Center)
     ax5 = plt.subplot(4, 3, 5)
     ev_sorted = df.sort_values('Enterprise Value_numeric', ascending=True)
     bar_colors = [ticker_colors[ticker] for ticker in ev_sorted['Ticker']]
-    bars5 = ax5.barh(ev_sorted['Ticker'], ev_sorted['Enterprise Value_numeric'] / 1e12, color=bar_colors, alpha=0.7)
-    ax5.set_xlabel('Enterprise Value (Trillions $)')
-    ax5.set_title('Enterprise Value', fontweight='bold')
-    ax5.grid(axis='x', alpha=0.3)
+    y_pos = np.arange(len(ev_sorted))
+    ax5.hlines(y=y_pos, xmin=0, xmax=ev_sorted['Enterprise Value_numeric'] / 1e12, color='gray', alpha=0.4, linewidth=1)
+    ax5.scatter(ev_sorted['Enterprise Value_numeric'] / 1e12, y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax5.set_xlabel('Enterprise Value (Trillions $)', fontsize=10)
+    ax5.set_title('Enterprise Value', fontweight='bold', fontsize=11)
+    ax5.set_yticks(y_pos)
+    ax5.set_yticklabels(ev_sorted['Ticker'], fontsize=10)
+    ax5.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
     for i, (idx, row) in enumerate(ev_sorted.iterrows()):
-        ax5.text(row['Enterprise Value_numeric'] / 1e12 + 0.05, i, 
+        ax5.text(row['Enterprise Value_numeric'] / 1e12 + 0.08, i, 
                 f"${row['Enterprise Value_numeric']/1e12:.2f}T", 
-                va='center', fontsize=9)
+                va='center', fontsize=9, fontweight='bold')
     
     # 6. Price/Sales (Position 6 - Row 2 Right)
     ax6 = plt.subplot(4, 3, 6)
     ps_sorted = df.sort_values('P/S Ratio_numeric', ascending=True)
     bar_colors = [ticker_colors[ticker] for ticker in ps_sorted['Ticker']]
-    bars6 = ax6.barh(ps_sorted['Ticker'], ps_sorted['P/S Ratio_numeric'], color=bar_colors, alpha=0.7)
-    ax6.set_xlabel('Price/Sales Ratio')
-    ax6.set_title('Price/Sales (TTM)', fontweight='bold')
-    ax6.grid(axis='x', alpha=0.3)
+    y_pos = np.arange(len(ps_sorted))
+    ax6.hlines(y=y_pos, xmin=0, xmax=ps_sorted['P/S Ratio_numeric'], color='gray', alpha=0.4, linewidth=1)
+    ax6.scatter(ps_sorted['P/S Ratio_numeric'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax6.set_xlabel('Price/Sales Ratio', fontsize=10)
+    ax6.set_title('Price/Sales (TTM)', fontweight='bold', fontsize=11)
+    ax6.set_yticks(y_pos)
+    ax6.set_yticklabels(ps_sorted['Ticker'], fontsize=10)
+    ax6.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
     for i, (idx, row) in enumerate(ps_sorted.iterrows()):
-        ax6.text(row['P/S Ratio_numeric'] + 0.3, i, 
+        ax6.text(row['P/S Ratio_numeric'] + 0.4, i, 
                 f"{row['P/S Ratio_numeric']:.2f}", 
-                va='center', fontsize=9)
+                va='center', fontsize=9, fontweight='bold')
     
     # 7. Price/Book Ratio (Position 7 - Row 3 Left)
     ax7 = plt.subplot(4, 3, 7)
     pb_sorted = df.sort_values('P/B Ratio_numeric', ascending=True)
     bar_colors = [ticker_colors[ticker] for ticker in pb_sorted['Ticker']]
-    bars7 = ax7.barh(pb_sorted['Ticker'], pb_sorted['P/B Ratio_numeric'], color=bar_colors, alpha=0.7)
-    ax7.set_xlabel('Price/Book Ratio')
-    ax7.set_title('Price/Book (MRQ)', fontweight='bold')
-    ax7.grid(axis='x', alpha=0.3)
+    y_pos = np.arange(len(pb_sorted))
+    ax7.hlines(y=y_pos, xmin=0, xmax=pb_sorted['P/B Ratio_numeric'], color='gray', alpha=0.4, linewidth=1)
+    ax7.scatter(pb_sorted['P/B Ratio_numeric'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax7.set_xlabel('Price/Book Ratio', fontsize=10)
+    ax7.set_title('Price/Book (MRQ)', fontweight='bold', fontsize=11)
+    ax7.set_yticks(y_pos)
+    ax7.set_yticklabels(pb_sorted['Ticker'], fontsize=10)
+    ax7.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
     for i, (idx, row) in enumerate(pb_sorted.iterrows()):
-        ax7.text(row['P/B Ratio_numeric'] + 1, i, 
+        ax7.text(row['P/B Ratio_numeric'] + 1.2, i, 
                 f"{row['P/B Ratio_numeric']:.2f}", 
-                va='center', fontsize=9)
-    
-    for i, (idx, row) in enumerate(pb_sorted.iterrows()):
-        ax7.text(row['P/B Ratio_numeric'] + 1, i, 
-                f"{row['P/B Ratio_numeric']:.2f}", 
-                va='center', fontsize=9)
+                va='center', fontsize=9, fontweight='bold')
     
     # 8. Enterprise Value/Revenue (Position 8 - Row 3 Center)
     ax8 = plt.subplot(4, 3, 8)
     evr_sorted = df.sort_values('Enterprise Value/Revenue_numeric', ascending=True)
     bar_colors = [ticker_colors[ticker] for ticker in evr_sorted['Ticker']]
-    bars8 = ax8.barh(evr_sorted['Ticker'], evr_sorted['Enterprise Value/Revenue_numeric'], 
-                     color=bar_colors, alpha=0.7)
-    ax8.set_xlabel('EV/Revenue Ratio')
-    ax8.set_title('Enterprise Value / Revenue', fontweight='bold')
-    ax8.grid(axis='x', alpha=0.3)
+    y_pos = np.arange(len(evr_sorted))
+    ax8.hlines(y=y_pos, xmin=0, xmax=evr_sorted['Enterprise Value/Revenue_numeric'], color='gray', alpha=0.4, linewidth=1)
+    ax8.scatter(evr_sorted['Enterprise Value/Revenue_numeric'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax8.set_xlabel('EV/Revenue Ratio', fontsize=10)
+    ax8.set_title('Enterprise Value / Revenue', fontweight='bold', fontsize=11)
+    ax8.set_yticks(y_pos)
+    ax8.set_yticklabels(evr_sorted['Ticker'], fontsize=10)
+    ax8.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
     for i, (idx, row) in enumerate(evr_sorted.iterrows()):
-        ax8.text(row['Enterprise Value/Revenue_numeric'] + 0.3, i, 
+        ax8.text(row['Enterprise Value/Revenue_numeric'] + 0.4, i, 
                 f"{row['Enterprise Value/Revenue_numeric']:.2f}", 
-                va='center', fontsize=9)
+                va='center', fontsize=9, fontweight='bold')
     
     # 9. Enterprise Value/EBITDA (Position 9 - Row 3 Right)
     ax9 = plt.subplot(4, 3, 9)
     evebitda_sorted = df.sort_values('Enterprise Value/EBITDA_numeric', ascending=True)
     bar_colors = [ticker_colors[ticker] for ticker in evebitda_sorted['Ticker']]
-    bars9 = ax9.barh(evebitda_sorted['Ticker'], 
-                     evebitda_sorted['Enterprise Value/EBITDA_numeric'], color=bar_colors, alpha=0.7)
-    ax9.set_xlabel('EV/EBITDA Ratio')
-    ax9.set_title('Enterprise Value / EBITDA', fontweight='bold')
-    ax9.grid(axis='x', alpha=0.3)
+    y_pos = np.arange(len(evebitda_sorted))
+    ax9.hlines(y=y_pos, xmin=0, xmax=evebitda_sorted['Enterprise Value/EBITDA_numeric'], color='gray', alpha=0.4, linewidth=1)
+    ax9.scatter(evebitda_sorted['Enterprise Value/EBITDA_numeric'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax9.set_xlabel('EV/EBITDA Ratio', fontsize=10)
+    ax9.set_title('Enterprise Value / EBITDA', fontweight='bold', fontsize=11)
+    ax9.set_yticks(y_pos)
+    ax9.set_yticklabels(evebitda_sorted['Ticker'], fontsize=10)
+    ax9.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
     for i, (idx, row) in enumerate(evebitda_sorted.iterrows()):
-        ax9.text(row['Enterprise Value/EBITDA_numeric'] + 2, i, 
+        ax9.text(row['Enterprise Value/EBITDA_numeric'] + 2.5, i, 
                 f"{row['Enterprise Value/EBITDA_numeric']:.2f}", 
-                va='center', fontsize=9)
+                va='center', fontsize=9, fontweight='bold')
     
     # 10. Valuation Multiples Heatmap (Bottom Row - spanning 3 columns)
     ax10 = plt.subplot(4, 3, (10, 12))
@@ -322,9 +347,9 @@ def create_consolidated_visualizations(df_full, version='v1'):
         ('P/B Ratio', 'P/B Ratio_numeric')          # Fig 06
     ]
     
-    # Color scheme
-    colors_yahoo = '#1f77b4'  # Blue
-    colors_sa = '#ff7f0e'     # Orange
+    # Color scheme - Tableau colors
+    colors_yahoo = '#4E79A7'  # Tableau Blue
+    colors_sa = '#F28E2B'     # Tableau Orange
     
     for idx, (title, col_base) in enumerate(metrics):
         ax = axes[idx // 3, idx % 3]
@@ -338,18 +363,18 @@ def create_consolidated_visualizations(df_full, version='v1'):
         x = np.arange(len(df_plot))
         width = 0.35
         
-        # Plot bars
+        # Plot bars with improved styling
         bars1 = ax.barh(x - width/2, df_plot[col_yahoo], width, 
-                        label='Yahoo Finance', color=colors_yahoo, alpha=0.8)
+                        label='Yahoo Finance', color=colors_yahoo, alpha=0.85, edgecolor='black', linewidth=0.5)
         bars2 = ax.barh(x + width/2, df_plot[col_sa], width, 
-                        label='StockAnalysis', color=colors_sa, alpha=0.8)
+                        label='StockAnalysis', color=colors_sa, alpha=0.85, edgecolor='black', linewidth=0.5)
         
-        ax.set_xlabel(title)
-        ax.set_title(f'{title} Comparison', fontweight='bold')
+        ax.set_xlabel(title, fontsize=10)
+        ax.set_title(f'{title} Comparison', fontweight='bold', fontsize=11)
         ax.set_yticks(x)
-        ax.set_yticklabels(df_plot['Ticker'])
-        ax.legend(loc='best')
-        ax.grid(axis='x', alpha=0.3)
+        ax.set_yticklabels(df_plot['Ticker'], fontsize=10)
+        ax.legend(loc='best', fontsize=9)
+        ax.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
         
         # Add value labels (adjust format for VCR which uses 3 decimals)
         for i, (_, row) in enumerate(df_plot.iterrows()):
@@ -406,10 +431,10 @@ def create_consolidated_mean_visualizations(df_full, version='v1'):
     # Get fetch date from the data
     fetch_date = df_full['Fetch_Date'].iloc[0] if 'Fetch_Date' in df_full.columns else datetime.now().strftime('%Y-%m-%d')
     
-    # Create consistent color mapping for each company
+    # Create consistent color mapping for each company using Tableau 10 colors
     all_tickers = sorted(df_merged['Ticker'].unique())
-    color_palette = sns.color_palette("husl", len(all_tickers))
-    ticker_colors = {ticker: color_palette[i] for i, ticker in enumerate(all_tickers)}
+    tableau_colors = ['#4E79A7', '#F28E2B', '#E15759', '#76B7B2', '#59A14F', '#EDC948', '#B07AA1', '#FF9DA7', '#9C755F', '#BAB0AC']
+    ticker_colors = {ticker: tableau_colors[i % len(tableau_colors)] for i, ticker in enumerate(all_tickers)}
     
     # Create figure with 6 subplots (2x3)
     fig, axes = plt.subplots(2, 3, figsize=(20, 12))
@@ -449,19 +474,23 @@ def create_consolidated_mean_visualizations(df_full, version='v1'):
         # Get colors for each company
         bar_colors = [ticker_colors[ticker] for ticker in df_plot['Ticker']]
         
-        # Plot bars
-        bars = ax.barh(df_plot['Ticker'], df_plot[f'{col_base}_mean'], color=bar_colors, alpha=0.7)
+        # Plot lollipop chart
+        y_pos = np.arange(len(df_plot))
+        ax.hlines(y=y_pos, xmin=0, xmax=df_plot[f'{col_base}_mean'], color='gray', alpha=0.4, linewidth=1)
+        ax.scatter(df_plot[f'{col_base}_mean'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
         
-        ax.set_xlabel(f'{title_text} (Mean)')
-        ax.set_title(f'{title_text}', fontweight='bold')
-        ax.grid(axis='x', alpha=0.3)
+        ax.set_xlabel(f'{title_text} (Mean)', fontsize=10)
+        ax.set_title(f'{title_text}', fontweight='bold', fontsize=11)
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(df_plot['Ticker'], fontsize=10)
+        ax.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
         
         # Add value labels (adjust format for VCR which uses 3 decimals)
         for i, (_, row) in enumerate(df_plot.iterrows()):
             if not pd.isna(row[f'{col_base}_mean']):
                 if title_text == 'VCR':
                     label_text = f"{row[f'{col_base}_mean']:.3f}"
-                    offset = 0.02
+                    offset = 0.03
                 else:
                     label_text = f"{row[f'{col_base}_mean']:.2f}"
                     offset = 0.5
