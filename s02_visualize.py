@@ -117,7 +117,7 @@ def create_visualizations(df, version_suffix=''):
     bar_colors = [ticker_colors[ticker] for ticker in vcr_sorted['Ticker']]
     y_pos = np.arange(len(vcr_sorted))
     ax2.hlines(y=y_pos, xmin=0, xmax=vcr_sorted['VCR_numeric'], color='gray', alpha=0.4, linewidth=1)
-    ax2.scatter(vcr_sorted['VCR_numeric'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax2.scatter(vcr_sorted['VCR_numeric'], y_pos, color=bar_colors, s=200, alpha=0.85, edgecolors='black', linewidth=1.5)
     
     ax2.set_xlabel('VCR Ratio (Forward P/E / Trailing P/E)', fontsize=10)
     ax2.set_title('VCR - Valuation Compression Ratio\n<1: Growth | >1: Decline', 
@@ -128,10 +128,13 @@ def create_visualizations(df, version_suffix=''):
     ax2.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     ax2.legend(loc='best', fontsize=9)
     
+    # Dynamic offset: 4% of data range + minimum offset
+    vcr_range = vcr_sorted['VCR_numeric'].max() - vcr_sorted['VCR_numeric'].min()
+    vcr_offset = max(vcr_range * 0.04, 0.02)
     for i, (idx, row) in enumerate(vcr_sorted.iterrows()):
-        ax2.text(row['VCR_numeric'] + 0.03, i, 
+        ax2.text(row['VCR_numeric'] + vcr_offset, i, 
                 f"{row['VCR_numeric']:.3f}", 
-                va='center', fontsize=9, fontweight='bold')
+                va='center', ha='left', fontsize=9, fontweight='bold')
     
     # TOP 3: PEG Ratio (Position 3 - Top Right)
     ax3 = plt.subplot(4, 3, 3)
@@ -139,17 +142,20 @@ def create_visualizations(df, version_suffix=''):
     bar_colors = [ticker_colors[ticker] for ticker in peg_sorted['Ticker']]
     y_pos = np.arange(len(peg_sorted))
     ax3.hlines(y=y_pos, xmin=0, xmax=peg_sorted['PEG Ratio_numeric'], color='gray', alpha=0.4, linewidth=1)
-    ax3.scatter(peg_sorted['PEG Ratio_numeric'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax3.scatter(peg_sorted['PEG Ratio_numeric'], y_pos, color=bar_colors, s=200, alpha=0.85, edgecolors='black', linewidth=1.5)
     ax3.set_xlabel('PEG Ratio', fontsize=10)
     ax3.set_title('PEG Ratio (5yr expected)\nLower = Better Value', fontweight='bold', fontsize=11)
     ax3.set_yticks(y_pos)
     ax3.set_yticklabels(peg_sorted['Ticker'], fontsize=10)
     ax3.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
+    # Dynamic offset: 4% of data range + minimum offset
+    peg_range = peg_sorted['PEG Ratio_numeric'].max() - peg_sorted['PEG Ratio_numeric'].min()
+    peg_offset = max(peg_range * 0.04, 0.2)
     for i, (idx, row) in enumerate(peg_sorted.iterrows()):
-        ax3.text(row['PEG Ratio_numeric'] + 0.15, i, 
+        ax3.text(row['PEG Ratio_numeric'] + peg_offset, i, 
                 f"{row['PEG Ratio_numeric']:.2f}", 
-                va='center', fontsize=9, fontweight='bold')
+                va='center', ha='left', fontsize=9, fontweight='bold')
     
     # 4. Market Cap Comparison (Position 4 - Row 2 Left)
     ax4 = plt.subplot(4, 3, 4)
@@ -157,17 +163,20 @@ def create_visualizations(df, version_suffix=''):
     bar_colors = [ticker_colors[ticker] for ticker in market_caps['Ticker']]
     y_pos = np.arange(len(market_caps))
     ax4.hlines(y=y_pos, xmin=0, xmax=market_caps['Market Cap_numeric'] / 1e12, color='gray', alpha=0.4, linewidth=1)
-    ax4.scatter(market_caps['Market Cap_numeric'] / 1e12, y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax4.scatter(market_caps['Market Cap_numeric'] / 1e12, y_pos, color=bar_colors, s=200, alpha=0.85, edgecolors='black', linewidth=1.5)
     ax4.set_xlabel('Market Cap (Trillions $)', fontsize=10)
     ax4.set_title('Market Capitalization', fontweight='bold', fontsize=11)
     ax4.set_yticks(y_pos)
     ax4.set_yticklabels(market_caps['Ticker'], fontsize=10)
     ax4.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
+    # Dynamic offset: 4% of data range + minimum offset
+    mc_range = (market_caps['Market Cap_numeric'].max() - market_caps['Market Cap_numeric'].min()) / 1e12
+    mc_offset = max(mc_range * 0.04, 0.06)
     for i, (idx, row) in enumerate(market_caps.iterrows()):
-        ax4.text(row['Market Cap_numeric'] / 1e12 + 0.08, i, 
+        ax4.text(row['Market Cap_numeric'] / 1e12 + mc_offset, i, 
                 f"${row['Market Cap_numeric']/1e12:.2f}T", 
-                va='center', fontsize=9, fontweight='bold')
+                va='center', ha='left', fontsize=9, fontweight='bold')
     
     # 5. Enterprise Value Comparison (Position 5 - Row 2 Center)
     ax5 = plt.subplot(4, 3, 5)
@@ -175,17 +184,20 @@ def create_visualizations(df, version_suffix=''):
     bar_colors = [ticker_colors[ticker] for ticker in ev_sorted['Ticker']]
     y_pos = np.arange(len(ev_sorted))
     ax5.hlines(y=y_pos, xmin=0, xmax=ev_sorted['Enterprise Value_numeric'] / 1e12, color='gray', alpha=0.4, linewidth=1)
-    ax5.scatter(ev_sorted['Enterprise Value_numeric'] / 1e12, y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax5.scatter(ev_sorted['Enterprise Value_numeric'] / 1e12, y_pos, color=bar_colors, s=200, alpha=0.85, edgecolors='black', linewidth=1.5)
     ax5.set_xlabel('Enterprise Value (Trillions $)', fontsize=10)
     ax5.set_title('Enterprise Value', fontweight='bold', fontsize=11)
     ax5.set_yticks(y_pos)
     ax5.set_yticklabels(ev_sorted['Ticker'], fontsize=10)
     ax5.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
+    # Dynamic offset: 4% of data range + minimum offset
+    ev_range = (ev_sorted['Enterprise Value_numeric'].max() - ev_sorted['Enterprise Value_numeric'].min()) / 1e12
+    ev_offset = max(ev_range * 0.04, 0.06)
     for i, (idx, row) in enumerate(ev_sorted.iterrows()):
-        ax5.text(row['Enterprise Value_numeric'] / 1e12 + 0.08, i, 
+        ax5.text(row['Enterprise Value_numeric'] / 1e12 + ev_offset, i, 
                 f"${row['Enterprise Value_numeric']/1e12:.2f}T", 
-                va='center', fontsize=9, fontweight='bold')
+                va='center', ha='left', fontsize=9, fontweight='bold')
     
     # 6. Price/Sales (Position 6 - Row 2 Right)
     ax6 = plt.subplot(4, 3, 6)
@@ -193,17 +205,20 @@ def create_visualizations(df, version_suffix=''):
     bar_colors = [ticker_colors[ticker] for ticker in ps_sorted['Ticker']]
     y_pos = np.arange(len(ps_sorted))
     ax6.hlines(y=y_pos, xmin=0, xmax=ps_sorted['P/S Ratio_numeric'], color='gray', alpha=0.4, linewidth=1)
-    ax6.scatter(ps_sorted['P/S Ratio_numeric'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax6.scatter(ps_sorted['P/S Ratio_numeric'], y_pos, color=bar_colors, s=200, alpha=0.85, edgecolors='black', linewidth=1.5)
     ax6.set_xlabel('Price/Sales Ratio', fontsize=10)
     ax6.set_title('Price/Sales (TTM)', fontweight='bold', fontsize=11)
     ax6.set_yticks(y_pos)
     ax6.set_yticklabels(ps_sorted['Ticker'], fontsize=10)
     ax6.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
+    # Dynamic offset: 4% of data range + minimum offset
+    ps_range = ps_sorted['P/S Ratio_numeric'].max() - ps_sorted['P/S Ratio_numeric'].min()
+    ps_offset = max(ps_range * 0.04, 0.3)
     for i, (idx, row) in enumerate(ps_sorted.iterrows()):
-        ax6.text(row['P/S Ratio_numeric'] + 0.4, i, 
+        ax6.text(row['P/S Ratio_numeric'] + ps_offset, i, 
                 f"{row['P/S Ratio_numeric']:.2f}", 
-                va='center', fontsize=9, fontweight='bold')
+                va='center', ha='left', fontsize=9, fontweight='bold')
     
     # 7. Price/Book Ratio (Position 7 - Row 3 Left)
     ax7 = plt.subplot(4, 3, 7)
@@ -211,17 +226,20 @@ def create_visualizations(df, version_suffix=''):
     bar_colors = [ticker_colors[ticker] for ticker in pb_sorted['Ticker']]
     y_pos = np.arange(len(pb_sorted))
     ax7.hlines(y=y_pos, xmin=0, xmax=pb_sorted['P/B Ratio_numeric'], color='gray', alpha=0.4, linewidth=1)
-    ax7.scatter(pb_sorted['P/B Ratio_numeric'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax7.scatter(pb_sorted['P/B Ratio_numeric'], y_pos, color=bar_colors, s=200, alpha=0.85, edgecolors='black', linewidth=1.5)
     ax7.set_xlabel('Price/Book Ratio', fontsize=10)
     ax7.set_title('Price/Book (MRQ)', fontweight='bold', fontsize=11)
     ax7.set_yticks(y_pos)
     ax7.set_yticklabels(pb_sorted['Ticker'], fontsize=10)
     ax7.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
+    # Dynamic offset: 4% of data range + minimum offset
+    pb_range = pb_sorted['P/B Ratio_numeric'].max() - pb_sorted['P/B Ratio_numeric'].min()
+    pb_offset = max(pb_range * 0.04, 1.0)
     for i, (idx, row) in enumerate(pb_sorted.iterrows()):
-        ax7.text(row['P/B Ratio_numeric'] + 1.2, i, 
+        ax7.text(row['P/B Ratio_numeric'] + pb_offset, i, 
                 f"{row['P/B Ratio_numeric']:.2f}", 
-                va='center', fontsize=9, fontweight='bold')
+                va='center', ha='left', fontsize=9, fontweight='bold')
     
     # 8. Enterprise Value/Revenue (Position 8 - Row 3 Center)
     ax8 = plt.subplot(4, 3, 8)
@@ -229,17 +247,20 @@ def create_visualizations(df, version_suffix=''):
     bar_colors = [ticker_colors[ticker] for ticker in evr_sorted['Ticker']]
     y_pos = np.arange(len(evr_sorted))
     ax8.hlines(y=y_pos, xmin=0, xmax=evr_sorted['Enterprise Value/Revenue_numeric'], color='gray', alpha=0.4, linewidth=1)
-    ax8.scatter(evr_sorted['Enterprise Value/Revenue_numeric'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax8.scatter(evr_sorted['Enterprise Value/Revenue_numeric'], y_pos, color=bar_colors, s=200, alpha=0.85, edgecolors='black', linewidth=1.5)
     ax8.set_xlabel('EV/Revenue Ratio', fontsize=10)
     ax8.set_title('Enterprise Value / Revenue', fontweight='bold', fontsize=11)
     ax8.set_yticks(y_pos)
     ax8.set_yticklabels(evr_sorted['Ticker'], fontsize=10)
     ax8.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
+    # Dynamic offset: 4% of data range + minimum offset
+    evr_range = evr_sorted['Enterprise Value/Revenue_numeric'].max() - evr_sorted['Enterprise Value/Revenue_numeric'].min()
+    evr_offset = max(evr_range * 0.04, 0.3)
     for i, (idx, row) in enumerate(evr_sorted.iterrows()):
-        ax8.text(row['Enterprise Value/Revenue_numeric'] + 0.4, i, 
+        ax8.text(row['Enterprise Value/Revenue_numeric'] + evr_offset, i, 
                 f"{row['Enterprise Value/Revenue_numeric']:.2f}", 
-                va='center', fontsize=9, fontweight='bold')
+                va='center', ha='left', fontsize=9, fontweight='bold')
     
     # 9. Enterprise Value/EBITDA (Position 9 - Row 3 Right)
     ax9 = plt.subplot(4, 3, 9)
@@ -247,17 +268,20 @@ def create_visualizations(df, version_suffix=''):
     bar_colors = [ticker_colors[ticker] for ticker in evebitda_sorted['Ticker']]
     y_pos = np.arange(len(evebitda_sorted))
     ax9.hlines(y=y_pos, xmin=0, xmax=evebitda_sorted['Enterprise Value/EBITDA_numeric'], color='gray', alpha=0.4, linewidth=1)
-    ax9.scatter(evebitda_sorted['Enterprise Value/EBITDA_numeric'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+    ax9.scatter(evebitda_sorted['Enterprise Value/EBITDA_numeric'], y_pos, color=bar_colors, s=200, alpha=0.85, edgecolors='black', linewidth=1.5)
     ax9.set_xlabel('EV/EBITDA Ratio', fontsize=10)
     ax9.set_title('Enterprise Value / EBITDA', fontweight='bold', fontsize=11)
     ax9.set_yticks(y_pos)
     ax9.set_yticklabels(evebitda_sorted['Ticker'], fontsize=10)
     ax9.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
     
+    # Dynamic offset: 4% of data range + minimum offset
+    evebitda_range = evebitda_sorted['Enterprise Value/EBITDA_numeric'].max() - evebitda_sorted['Enterprise Value/EBITDA_numeric'].min()
+    evebitda_offset = max(evebitda_range * 0.04, 2.0)
     for i, (idx, row) in enumerate(evebitda_sorted.iterrows()):
-        ax9.text(row['Enterprise Value/EBITDA_numeric'] + 2.5, i, 
+        ax9.text(row['Enterprise Value/EBITDA_numeric'] + evebitda_offset, i, 
                 f"{row['Enterprise Value/EBITDA_numeric']:.2f}", 
-                va='center', fontsize=9, fontweight='bold')
+                va='center', ha='left', fontsize=9, fontweight='bold')
     
     # 10. Valuation Multiples Heatmap (Bottom Row - spanning 3 columns)
     ax10 = plt.subplot(4, 3, (10, 12))
@@ -376,26 +400,38 @@ def create_consolidated_visualizations(df_full, version='v1'):
         ax.legend(loc='best', fontsize=9)
         ax.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
         
+        # Calculate dynamic offset based on data range
+        combined_values = pd.concat([df_plot[col_yahoo], df_plot[col_sa]]).dropna()
+        data_range = combined_values.max() - combined_values.min()
+        # Set appropriate minimum offset for each metric
+        if title == 'VCR':
+            min_offset = 0.015
+        elif title == 'Trailing P/E' or title == 'Forward P/E':
+            min_offset = 1.5
+        elif title == 'PEG Ratio':
+            min_offset = 0.15
+        elif title == 'P/S Ratio':
+            min_offset = 0.3
+        else:  # P/B Ratio
+            min_offset = 0.8
+        offset = max(data_range * 0.025, min_offset)
+        
         # Add value labels (adjust format for VCR which uses 3 decimals)
         for i, (_, row) in enumerate(df_plot.iterrows()):
             if not pd.isna(row[col_yahoo]):
                 if title == 'VCR':
                     label_text = f"{row[col_yahoo]:.3f}"
-                    offset = 0.02
                 else:
                     label_text = f"{row[col_yahoo]:.2f}"
-                    offset = 0.5
                 ax.text(row[col_yahoo] + offset, i - width/2, label_text, 
-                       va='center', fontsize=8, color=colors_yahoo)
+                       va='center', ha='left', fontsize=8, color=colors_yahoo)
             if not pd.isna(row[col_sa]):
                 if title == 'VCR':
                     label_text = f"{row[col_sa]:.3f}"
-                    offset = 0.02
                 else:
                     label_text = f"{row[col_sa]:.2f}"
-                    offset = 0.5
                 ax.text(row[col_sa] + offset, i + width/2, label_text, 
-                       va='center', fontsize=8, color=colors_sa)
+                       va='center', ha='left', fontsize=8, color=colors_sa)
     
     plt.tight_layout()
     
@@ -477,7 +513,7 @@ def create_consolidated_mean_visualizations(df_full, version='v1'):
         # Plot lollipop chart
         y_pos = np.arange(len(df_plot))
         ax.hlines(y=y_pos, xmin=0, xmax=df_plot[f'{col_base}_mean'], color='gray', alpha=0.4, linewidth=1)
-        ax.scatter(df_plot[f'{col_base}_mean'], y_pos, color=bar_colors, s=150, alpha=0.85, edgecolors='black', linewidth=1.5)
+        ax.scatter(df_plot[f'{col_base}_mean'], y_pos, color=bar_colors, s=200, alpha=0.85, edgecolors='black', linewidth=1.5)
         
         ax.set_xlabel(f'{title_text} (Mean)', fontsize=10)
         ax.set_title(f'{title_text}', fontweight='bold', fontsize=11)
@@ -485,17 +521,28 @@ def create_consolidated_mean_visualizations(df_full, version='v1'):
         ax.set_yticklabels(df_plot['Ticker'], fontsize=10)
         ax.grid(axis='x', alpha=0.4, linestyle='--', linewidth=0.5)
         
-        # Add value labels (adjust format for VCR which uses 3 decimals)
+        # Add value labels with dynamic offset based on metric
+        mean_range = df_plot[f'{col_base}_mean'].max() - df_plot[f'{col_base}_mean'].min()
+        # Set appropriate minimum offset for each metric
+        if title_text == 'VCR':
+            min_offset = 0.02
+        elif title_text == 'Trailing P/E' or title_text == 'Forward P/E':
+            min_offset = 1.0
+        elif title_text == 'PEG Ratio':
+            min_offset = 0.15
+        elif title_text == 'P/S Ratio':
+            min_offset = 0.3
+        else:  # P/B Ratio
+            min_offset = 0.8
+        offset = max(mean_range * 0.04, min_offset)
         for i, (_, row) in enumerate(df_plot.iterrows()):
             if not pd.isna(row[f'{col_base}_mean']):
                 if title_text == 'VCR':
                     label_text = f"{row[f'{col_base}_mean']:.3f}"
-                    offset = 0.03
                 else:
                     label_text = f"{row[f'{col_base}_mean']:.2f}"
-                    offset = 0.5
                 ax.text(row[f'{col_base}_mean'] + offset, i, label_text, 
-                       va='center', fontsize=9, fontweight='bold')
+                       va='center', ha='left', fontsize=9, fontweight='bold')
     
     plt.tight_layout()
     
