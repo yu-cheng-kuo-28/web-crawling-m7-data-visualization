@@ -212,17 +212,18 @@ def crawl_magnificent7() -> None:
     # Load term conversion table
     term_mappings = load_term_conversion_table()
     
-    #! Check if data for today already exists
+    #! Check if data for today already exists in full CSV
     csv_dir = 'csv'
-    current_csv = os.path.join(csv_dir, "valuation_measures_current.csv")
+    full_csv = os.path.join(csv_dir, "valuation_measures_full.csv")
     
-    if os.path.exists(current_csv):
-        existing_df = pd.read_csv(current_csv)
-        if 'Fetch_Date' in existing_df.columns and not existing_df.empty:
-            existing_date = existing_df['Fetch_Date'].iloc[0]
-            if existing_date == fetch_date:
-                print(f"\n✓ Data for {fetch_date} already exists in {current_csv}")
-                print("  Skipping fetch. Delete the CSV files if you want to re-fetch today's data.")
+    if os.path.exists(full_csv):
+        existing_full_df = pd.read_csv(full_csv)
+        if not existing_full_df.empty:
+            # Check if today's data already exists
+            today_data = existing_full_df[existing_full_df['Fetch_Date'] == fetch_date]
+            if not today_data.empty:
+                print(f"\n✓ Data for {fetch_date} already exists in {full_csv}")
+                print("  Skipping fetch. Delete the rows for this date if you want to re-fetch.")
                 return
 
     # Fetch from both Yahoo Finance and NASDAQ
@@ -293,21 +294,36 @@ def crawl_magnificent7() -> None:
         print("No data fetched. Nothing to save.")
         return
 
-    # Create tidy DataFrame
-    full_df = pd.DataFrame(all_data)
+    # Create tidy DataFrame for new data
+    new_df = pd.DataFrame(all_data)
 
     # Create csv directory if it doesn't exist
     csv_dir = 'csv'
     os.makedirs(csv_dir, exist_ok=True)
 
-    # Save full tidy dataset
+    # Load existing full dataset and append new data
     full_csv = os.path.join(csv_dir, "valuation_measures_full.csv")
+    if os.path.exists(full_csv):
+        existing_df = pd.read_csv(full_csv)
+        # Append new data to existing
+        full_df = pd.concat([existing_df, new_df], ignore_index=True)
+        print(f"\n[1] Appended new data to existing {full_csv}")
+        print(f"    Total records: {len(existing_df)} → {len(full_df)} (+{len(new_df)} new)")
+    else:
+        full_df = new_df
+        print(f"\n[1] Created new {full_csv}")
+    
+    # Save combined dataset
     full_df.to_csv(full_csv, index=False)
-    print(f"\n[1] Saved full valuation measures to: {full_csv}")
+    print(f"    Saved full valuation measures to: {full_csv}")
 
-    # Build and save 'Current' consolidated table (wide format):
-    # Since we have multiple data sources, we'll create one row per ticker+data_source combination
-    current_df = full_df.pivot_table(
+    # Build and save 'Current' consolidated table (wide format) - only latest date
+    # Filter to only the most recent date in the full dataset
+    latest_date = full_df['Fetch_Date'].max()
+    latest_data = full_df[full_df['Fetch_Date'] == latest_date].copy()
+    
+    # Create wide format for current data
+    current_df = latest_data.pivot_table(
         index=["Ticker", "Data_Source"], 
         columns="Measure", 
         values="Value_Formatted",
@@ -315,12 +331,12 @@ def crawl_magnificent7() -> None:
     ).reset_index()
     
     # Add Fetch_Date column at the beginning
-    current_df.insert(0, 'Fetch_Date', fetch_date)
+    current_df.insert(0, 'Fetch_Date', latest_date)
 
     current_csv = os.path.join(csv_dir, "valuation_measures_current.csv")
     current_df.to_csv(current_csv, index=False)
     print(f"[2] Saved consolidated 'Current' table to: {current_csv}")
-    print(f"    Format: Each ticker has 2 rows (yahoo_finance + stockanalysis)")
+    print(f"    Format: Latest date ({latest_date}) - Each ticker has 2 rows (yahoo_finance + stockanalysis)")
 
 
     if failed:

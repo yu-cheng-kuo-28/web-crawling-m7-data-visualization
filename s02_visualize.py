@@ -258,12 +258,12 @@ def create_visualizations(df, version_suffix=''):
     
     plt.tight_layout()
     
-    # Create pic directory if it doesn't exist
-    pic_dir = 'pic'
+    # Create pic directory with date-specific subdirectory
+    timestamp = datetime.now().strftime('%Y_%m%d')
+    pic_dir = os.path.join('pic', timestamp)
     os.makedirs(pic_dir, exist_ok=True)
     
-    # Generate filename with timestamp and data source
-    timestamp = datetime.now().strftime('%Y_%m%d')
+    # Generate filename with data source
     data_source = df['Data_Source'].iloc[0] if 'Data_Source' in df.columns else 'yahoo_finance'
     
     # Add version suffix if filtered
@@ -275,7 +275,7 @@ def create_visualizations(df, version_suffix=''):
     else:
         suffix = '_v1'
     
-    output_file = os.path.join(pic_dir, f'{data_source}_{timestamp}{suffix}.png')
+    output_file = os.path.join(pic_dir, f'{data_source}{suffix}.png')
     
     # Save the figure
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
@@ -374,13 +374,13 @@ def create_consolidated_visualizations(df_full, version='v1'):
     
     plt.tight_layout()
     
-    # Create pic directory if it doesn't exist
-    pic_dir = 'pic'
+    # Create pic directory with date-specific subdirectory
+    timestamp = datetime.now().strftime('%Y_%m%d')
+    pic_dir = os.path.join('pic', timestamp)
     os.makedirs(pic_dir, exist_ok=True)
     
-    # Generate filename with timestamp
-    timestamp = datetime.now().strftime('%Y_%m%d')
-    output_file = os.path.join(pic_dir, f'consolidated_separated_{timestamp}_{version}.png')
+    # Generate filename
+    output_file = os.path.join(pic_dir, f'consolidated_separated_{version}.png')
     
     # Save the figure
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
@@ -470,13 +470,13 @@ def create_consolidated_mean_visualizations(df_full, version='v1'):
     
     plt.tight_layout()
     
-    # Create pic directory if it doesn't exist
-    pic_dir = 'pic'
+    # Create pic directory with date-specific subdirectory
+    timestamp = datetime.now().strftime('%Y_%m%d')
+    pic_dir = os.path.join('pic', timestamp)
     os.makedirs(pic_dir, exist_ok=True)
     
-    # Generate filename with timestamp
-    timestamp = datetime.now().strftime('%Y_%m%d')
-    output_file = os.path.join(pic_dir, f'consolidated_mean_{timestamp}_{version}.png')
+    # Generate filename
+    output_file = os.path.join(pic_dir, f'consolidated_mean_{version}.png')
     
     # Save the figure
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
