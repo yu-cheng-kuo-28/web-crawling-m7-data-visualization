@@ -7,14 +7,26 @@
 tickers: []  # Empty = use all tickers from CSV
 
 # Alternative: Specify exact tickers to visualize
-# tickers:
-#   - AAPL
-#   - MSFT
-#   - GOOG
-#   - AMZN
-#   - META
-#   - NVDA
-#   - TSLA
+tickers:
+  # - ABNB
+  # - RACE
+  # - STZ
+  # - KO
+  # - AAPL
+  # - MSFT
+  # - GOOG
+  # - AMZN
+  # - META
+  # - NVDA
+  # - TSLA
+  - GM
+  - CRM
+  - ADBE
+  - QCOM
+  - JPM
+  - BAC
+  - WFC
+  - GS
 
 # Tickers to exclude from filtered visualizations (v2 versions)
 # These will still appear in v1 versions but excluded from v2

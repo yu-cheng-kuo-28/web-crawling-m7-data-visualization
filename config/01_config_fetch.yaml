@@ -24,15 +24,20 @@ tickers:
   - NFLX
   
   # Other stocks (uncomment to include)
-  # - CRM
+  - CRM
   # - ORCL
-  # - ADBE
-  # - QCOM
+  - ADBE
+  - QCOM
   # - TXN
+  - ABNB
+  - RACE
+  - STZ
+  - KO
+  - GM
   
   # Financial stocks (uncomment to include)
-  # - JPM
-  # - BAC
-  # - WFC
-  # - GS
-  # - MS
+  - JPM
+  - BAC
+  - WFC
+  - GS
+  - MS
